@@ -883,5 +883,7 @@ public class NamenodeBeanMetrics
       throw new IOException("Router is not initialized");
     }
     return this.router;
+    //aa
   }
 }
+
