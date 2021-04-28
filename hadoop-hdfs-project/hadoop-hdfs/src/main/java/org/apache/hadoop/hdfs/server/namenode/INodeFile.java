@@ -816,15 +816,16 @@ public class INodeFile extends INodeWithAdditionalFields
   // derive the intended storage type usage for quota by storage type
   @Override
   public final QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
-      byte blockStoragePolicyId, boolean useCache, int lastSnapshotId) {
-    final QuotaCounts counts = new QuotaCounts.Builder().nameSpace(1).build();
+      byte blockStoragePolicyId, boolean useCache, int lastSnapshotId,QuotaCounts counts) {
+
+    counts.addNameSpace(1);
 
     final BlockStoragePolicy bsp = (blockStoragePolicyId ==
         BLOCK_STORAGE_POLICY_ID_UNSPECIFIED) ? null :
         bsps.getPolicy(blockStoragePolicyId);
     FileWithSnapshotFeature sf = getFileWithSnapshotFeature();
     if (sf == null) {
-      counts.add(storagespaceConsumed(bsp));
+      storagespaceConsumed(bsp,counts);
       return counts;
     }
 
@@ -833,7 +834,7 @@ public class INodeFile extends INodeWithAdditionalFields
 
     if (lastSnapshotId == Snapshot.CURRENT_STATE_ID
         || last == Snapshot.CURRENT_STATE_ID) {
-      counts.add(storagespaceConsumed(bsp));
+      storagespaceConsumed(bsp,counts);
       return counts;
     }
 
@@ -873,7 +874,7 @@ public class INodeFile extends INodeWithAdditionalFields
   public final QuotaCounts computeQuotaUsageWithStriped(
       BlockStoragePolicy bsp, QuotaCounts counts) {
     counts.addNameSpace(1);
-    counts.add(storagespaceConsumed(bsp));
+    counts.add(storagespaceConsumed(bsp,counts));
     return counts;
   }
 
@@ -888,7 +889,7 @@ public class INodeFile extends INodeWithAdditionalFields
     FileWithSnapshotFeature sf = getFileWithSnapshotFeature();
     if (sf == null) {
       counts.addContent(Content.DISKSPACE,
-          storagespaceConsumed(null).getStorageSpace());
+          storagespaceConsumed(null,null).getStorageSpace());
     } else if (isStriped()) {
       counts.addContent(Content.DISKSPACE,
           storagespaceConsumedStriped().getStorageSpace());
@@ -921,7 +922,7 @@ public class INodeFile extends INodeWithAdditionalFields
 
     if (lastSnapshotId == Snapshot.CURRENT_STATE_ID
         || last == Snapshot.CURRENT_STATE_ID) {
-      return storagespaceConsumed(null).getStorageSpace();
+      return storagespaceConsumed(null,null).getStorageSpace();
     }
 
     final long ssDeltaNoReplication;
@@ -1010,11 +1011,15 @@ public class INodeFile extends INodeWithAdditionalFields
    * including blocks in its snapshots.
    * Use preferred block size for the last block if it is under construction.
    */
-  public final QuotaCounts storagespaceConsumed(BlockStoragePolicy bsp) {
+
+  public final QuotaCounts storagespaceConsumed(BlockStoragePolicy bsp, QuotaCounts counts) {
+    if (counts == null ){
+      counts = new QuotaCounts.Builder().build();
+    }
     if (isStriped()) {
-      return storagespaceConsumedStriped();
+      return storagespaceConsumedStriped(counts);
     } else {
-      return storagespaceConsumedContiguous(bsp);
+      return storagespaceConsumedContiguous(bsp,counts);
     }
   }
 
@@ -1031,9 +1036,20 @@ public class INodeFile extends INodeWithAdditionalFields
     return  counts;
   }
 
+  // TODO: support EC with heterogeneous storage
+  public final QuotaCounts storagespaceConsumedStriped(QuotaCounts counts) {
+    for (BlockInfo b : blocks) {
+      Preconditions.checkState(b.isStriped());
+      long blockSize = b.isComplete() ?
+              ((BlockInfoStriped)b).spaceConsumed() : getPreferredBlockSize() *
+              ((BlockInfoStriped)b).getTotalBlockNum();
+      counts.addStorageSpace(blockSize);
+    }
+    return  counts;
+  }
+
   public final QuotaCounts storagespaceConsumedContiguous(
-      BlockStoragePolicy bsp) {
-    QuotaCounts counts = new QuotaCounts.Builder().build();
+      BlockStoragePolicy bsp,QuotaCounts counts) {
     final Iterable<BlockInfo> blocks;
     FileWithSnapshotFeature sf = getFileWithSnapshotFeature();
     if (sf == null) {

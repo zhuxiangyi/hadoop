@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import java.util.Iterator;
 
+import com.sun.org.apache.xpath.internal.operations.Quo;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -102,8 +103,8 @@ public class INodeMap {
 
       @Override
       public QuotaCounts computeQuotaUsage(
-          BlockStoragePolicySuite bsps, byte blockStoragePolicyId,
-          boolean useCache, int lastSnapshotId) {
+              BlockStoragePolicySuite bsps, byte blockStoragePolicyId,
+              boolean useCache, int lastSnapshotId, QuotaCounts counts) {
         return null;
       }
 

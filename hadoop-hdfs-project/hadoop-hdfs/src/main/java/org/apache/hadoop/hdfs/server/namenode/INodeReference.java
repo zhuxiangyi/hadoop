@@ -329,9 +329,9 @@ public abstract class INodeReference extends INode {
 
   @Override
   public QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
-      byte blockStoragePolicyId, boolean useCache, int lastSnapshotId) {
+      byte blockStoragePolicyId, boolean useCache, int lastSnapshotId,QuotaCounts counts) {
     return referred.computeQuotaUsage(bsps, blockStoragePolicyId, useCache,
-        lastSnapshotId);
+        lastSnapshotId, counts);
   }
 
   @Override
@@ -619,7 +619,7 @@ public abstract class INodeReference extends INode {
 
     @Override
     public final QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
-        byte blockStoragePolicyId, boolean useCache, int lastSnapshotId) {
+        byte blockStoragePolicyId, boolean useCache, int lastSnapshotId,QuotaCounts counts) {
       // if this.lastSnapshotId < lastSnapshotId, the rename of the referred
       // node happened before the rename of its ancestor. This should be
       // impossible since for WithName node we only count its children at the
@@ -634,7 +634,7 @@ public abstract class INodeReference extends INode {
       // been updated by changes in the current tree.
       int id = lastSnapshotId != Snapshot.CURRENT_STATE_ID ? 
           lastSnapshotId : this.lastSnapshotId;
-      return referred.computeQuotaUsage(bsps, blockStoragePolicyId, false, id);
+      return referred.computeQuotaUsage(bsps, blockStoragePolicyId, false, id,counts);
     }
     
     @Override

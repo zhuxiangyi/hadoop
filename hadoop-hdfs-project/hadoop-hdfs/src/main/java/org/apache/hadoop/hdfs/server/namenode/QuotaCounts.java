@@ -81,8 +81,15 @@ public class QuotaCounts {
     private EnumCounters<StorageType> tsCounts;
 
     public Builder() {
-      this.nsSsCounts = QUOTA_DEFAULT;
-      this.tsCounts = STORAGE_TYPE_DEFAULT;
+      this.nsSsCounts = new EnumCounters<>(Quota.class, 0);
+      this.tsCounts = new EnumCounters<>(StorageType.class, 0);
+    }
+
+    public Builder(boolean flag) {
+      if (flag){
+        this.nsSsCounts = QUOTA_DEFAULT;
+        this.tsCounts = STORAGE_TYPE_DEFAULT;
+      }
     }
 
     public Builder nameSpace(long val) {
@@ -145,14 +152,16 @@ public class QuotaCounts {
   }
 
   public QuotaCounts add(QuotaCounts that) {
-    nsSsCounts = modify(nsSsCounts, ec -> ec.add(that.nsSsCounts));
-    tsCounts = modify(tsCounts, ec -> ec.add(that.tsCounts));
+    checkCopyEnumCounter(this);
+    this.nsSsCounts.add(that.nsSsCounts);
+    this.tsCounts.add(that.tsCounts);
     return this;
   }
 
   public QuotaCounts subtract(QuotaCounts that) {
-    nsSsCounts = modify(nsSsCounts, ec -> ec.subtract(that.nsSsCounts));
-    tsCounts = modify(tsCounts, ec -> ec.subtract(that.tsCounts));
+    checkCopyEnumCounter(this);
+    this.nsSsCounts.subtract(that.nsSsCounts);
+    this.tsCounts.subtract(that.tsCounts);
     return this;
   }
 
@@ -163,9 +172,17 @@ public class QuotaCounts {
    */
   public QuotaCounts negation() {
     QuotaCounts ret = new QuotaCounts.Builder().quotaCount(this).build();
-    ret.nsSsCounts = modify(ret.nsSsCounts, ec -> ec.negation());
-    ret.tsCounts = modify(ret.tsCounts, ec -> ec.negation());
+    checkCopyEnumCounter(ret);
+    ret.nsSsCounts.negation();
+    ret.tsCounts.negation();
     return ret;
+  }
+
+  public void checkCopyEnumCounter(QuotaCounts counts){
+    if (counts.tsCounts instanceof ConstEnumCounters){
+      counts.nsSsCounts = this.nsSsCounts.deepCopyEnumCounter();
+      counts.tsCounts = this.tsCounts.deepCopyEnumCounter();
+    }
   }
 
   public long getNameSpace(){
@@ -193,7 +210,8 @@ public class QuotaCounts {
   }
 
   public void addStorageSpace(long dsDelta) {
-    nsSsCounts = modify(nsSsCounts, ec -> ec.add(Quota.STORAGESPACE, dsDelta));
+    checkCopyEnumCounter(this);
+    this.nsSsCounts.add(Quota.STORAGESPACE,dsDelta);
   }
 
   public EnumCounters<StorageType> getTypeSpaces() {
@@ -216,7 +234,8 @@ public class QuotaCounts {
   }
 
   void setTypeSpace(StorageType type, long spaceCount) {
-    tsCounts = modify(tsCounts, ec -> ec.set(type, spaceCount));
+    checkCopyEnumCounter(this);
+    this.tsCounts.set(type,spaceCount);
   }
 
   public void addTypeSpace(StorageType type, long delta) {
