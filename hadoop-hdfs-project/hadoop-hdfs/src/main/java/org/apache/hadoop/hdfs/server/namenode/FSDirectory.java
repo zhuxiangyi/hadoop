@@ -972,7 +972,7 @@ public class FSDirectory implements Closeable {
       if (iip.getLastINode() == null) {
         throw new FileNotFoundException("Path not found: " + iip.getPath());
       }
-      updateCount(iip, nsDelta, ssDelta, replication);
+      updateCount(iip, nsDelta, ssDelta, replication, true);
     } finally {
       writeUnlock();
     }
