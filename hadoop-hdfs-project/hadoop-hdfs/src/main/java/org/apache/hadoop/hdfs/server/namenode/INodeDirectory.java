@@ -624,8 +624,9 @@ public class INodeDirectory extends INodeWithAdditionalFields
   }
 
   @Override
-  public QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
-      byte blockStoragePolicyId, boolean useCache, int lastSnapshotId,QuotaCounts counts) {
+  public QuotaCounts computeQuotaUsage(
+      BlockStoragePolicySuite bsps, byte blockStoragePolicyId,
+      boolean useCache, int lastSnapshotId, QuotaCounts counts) {
     final DirectoryWithSnapshotFeature sf = getDirectoryWithSnapshotFeature();
 
     // we are computing the quota usage for a specific snapshot here, i.e., the
@@ -637,8 +638,8 @@ public class INodeDirectory extends INodeWithAdditionalFields
       for (INode child : childrenList) {
         final byte childPolicyId = child.getStoragePolicyIDForQuota(
             blockStoragePolicyId);
-        child.computeQuotaUsage(bsps, childPolicyId, useCache,
-            lastSnapshotId, counts);
+        child.computeQuotaUsage(
+            bsps, childPolicyId, useCache, lastSnapshotId, counts);
       }
       counts.addNameSpace(1);
       return counts;
@@ -662,8 +663,8 @@ public class INodeDirectory extends INodeWithAdditionalFields
       for (INode child : children) {
         final byte childPolicyId = child.getStoragePolicyIDForQuota(
             blockStoragePolicyId);
-        counts.add(child.computeQuotaUsage(bsps, childPolicyId, useCache,
-            lastSnapshotId, counts));
+        child.computeQuotaUsage(
+            bsps, childPolicyId, useCache, lastSnapshotId, counts);
       }
     }
     return computeQuotaUsage4CurrentDirectory(bsps, blockStoragePolicyId,

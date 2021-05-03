@@ -42,7 +42,8 @@ public final class DirectoryWithQuotaFeature implements INode.Feature {
     private QuotaCounts usage;
 
     public Builder() {
-      this.quota = new QuotaCounts.Builder(true).nameSpace(DEFAULT_NAMESPACE_QUOTA).
+      this.quota = new QuotaCounts.Builder(true).
+          nameSpace(DEFAULT_NAMESPACE_QUOTA).
           storageSpace(DEFAULT_STORAGE_SPACE_QUOTA).
           typeSpaces(DEFAULT_STORAGE_SPACE_QUOTA).build();
       this.usage = new QuotaCounts.Builder(true).nameSpace(1).build();

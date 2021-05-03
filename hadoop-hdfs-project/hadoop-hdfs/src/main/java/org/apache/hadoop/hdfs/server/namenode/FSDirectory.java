@@ -1000,7 +1000,8 @@ public class FSDirectory implements Closeable {
    * when image/edits have been loaded and the file/dir to be deleted is not
    * contained in snapshots.
    */
-  void updateCountForDelete(final INode inode, final INodesInPath iip, QuotaCounts counts) {
+  void updateCountForDelete(final INode inode,
+                            final INodesInPath iip, QuotaCounts counts) {
     if (getFSNamesystem().isImageLoaded() &&
         !inode.isInLatestSnapshot(iip.getLatestSnapshotId())) {
       unprotectedUpdateCount(iip, iip.length() - 1, counts.negation());
@@ -1091,17 +1092,16 @@ public class FSDirectory implements Closeable {
   }
 
   /**
-   * Check that all parent directories have quotas set
+   * check that all parent directories have quotas set
    */
-  static boolean verifyIsQuota(INodesInPath iip, int pos ){
-    for(int i = (Math.min(pos, iip.length())-1); i > 0; i--) {
+  static boolean verifyIsQuota(INodesInPath iip, int pos) {
+    for (int i = (Math.min(pos, iip.length()) - 1); i > 0; i--) {
       INode currNode = iip.getINode(i);
-      if (currNode == null) continue;
+      if (currNode == null) {
+        continue;
+      }
       if (currNode.isDirectory()) {
-        final DirectoryWithQuotaFeature q
-            = currNode.asDirectory().getDirectoryWithQuotaFeature();
-        if (q != null && q.isQuotaSet()){
-          // a directory with quota
+        if (currNode.isQuotaSet()) {
           return true;
         }
       }
@@ -1208,7 +1208,7 @@ public class FSDirectory implements Closeable {
     cacheName(child);
     writeLock();
     try {
-      return addLastINode(existing, child, modes, true,null);
+      return addLastINode(existing, child, modes, true, null);
     } finally {
       writeUnlock();
     }
@@ -1391,9 +1391,8 @@ public class FSDirectory implements Closeable {
     // always verify inode name
     verifyINodeName(inode.getLocalNameBytes());
     if (counts == null) {
-      counts = inode
-          .computeQuotaUsage(getBlockStoragePolicySuite(),
-              parent.getStoragePolicyID(), false, Snapshot.CURRENT_STATE_ID);
+      counts = inode.computeQuotaUsage(getBlockStoragePolicySuite(),
+          parent.getStoragePolicyID(), false, Snapshot.CURRENT_STATE_ID);
     }
     updateCount(existing, pos, counts, checkQuota);
 

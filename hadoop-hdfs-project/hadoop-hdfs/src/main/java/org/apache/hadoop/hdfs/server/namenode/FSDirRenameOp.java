@@ -80,10 +80,12 @@ class FSDirRenameOp {
     BlockStoragePolicySuite bsps = fsd.getBlockStoragePolicySuite();
     // Reduce the required quota by dst that is being removed
     final INode dstINode = dst.getLastINode();
+    QuotaCounts delta = new QuotaCounts.Builder(true).build();
+    delta = delta.add(counts);
     if (dstINode != null) {
-      counts.subtract(dstINode.computeQuotaUsage(bsps));
+      delta.subtract(dstINode.computeQuotaUsage(bsps));
     }
-    FSDirectory.verifyQuota(dst, dst.length() - 1, counts, src.getINode(i - 1));
+    FSDirectory.verifyQuota(dst, dst.length() - 1, delta, src.getINode(i - 1));
   }
 
   /**
@@ -195,19 +197,25 @@ class FSDirRenameOp {
     QuotaCounts dstPolicyCounts = new QuotaCounts.Builder(true).build();
     BlockStoragePolicySuite bsps = fsd.getBlockStoragePolicySuite();
 
-    boolean srcIIPIsQuota = FSDirectory.verifyIsQuota(srcIIP, srcIIP.length() - 1);
-    boolean dstIIPIsQuota = FSDirectory.verifyIsQuota(dstIIP, dstIIP.length() - 1);
+    boolean srcIIPIsQuota = FSDirectory.verifyIsQuota(
+        srcIIP, srcIIP.length() - 1);
+    boolean dstIIPIsQuota = FSDirectory.verifyIsQuota(
+        dstIIP, dstIIP.length() - 1);
 
-    if (srcIIPIsQuota ) {
-      srcPolicyCounts = srcIIP.getLastINode().computeQuotaUsage(bsps);
-    }
-    if (dstIIPIsQuota){
-      dstPolicyCounts = srcIIP.getLastINode()
-          .computeQuotaUsage(bsps, dstParent.getStoragePolicyID(), false,
-              Snapshot.CURRENT_STATE_ID);
+    if (srcIIPIsQuota || dstIIPIsQuota) {
+      if (dstParent.getStoragePolicyID() ==
+          srcIIP.getLastINode().getStoragePolicyID()) {
+        srcPolicyCounts = srcIIP.getLastINode().computeQuotaUsage(bsps);
+        dstPolicyCounts = dstPolicyCounts.add(srcPolicyCounts);
+      } else {
+        srcPolicyCounts = srcIIP.getLastINode().computeQuotaUsage(bsps);
+        dstPolicyCounts = srcIIP.getLastINode()
+            .computeQuotaUsage(bsps, dstParent.getStoragePolicyID(), false,
+                Snapshot.CURRENT_STATE_ID);
+      }
     }
 
-    verifyQuotaForRename(fsd, srcIIP, dstIIP,dstPolicyCounts);
+    verifyQuotaForRename(fsd, srcIIP, dstIIP, dstPolicyCounts);
 
     RenameOperation tx = new RenameOperation(fsd, srcIIP, dstIIP);
 
@@ -428,15 +436,21 @@ class FSDirRenameOp {
     verifyFsLimitsForRename(fsd, srcIIP, dstIIP);
     QuotaCounts srcPolicyCounts = new QuotaCounts.Builder(true).build();
     QuotaCounts dstPolicyCounts = new QuotaCounts.Builder(true).build();
-    boolean srcIIPIsQuota = FSDirectory.verifyIsQuota(dstIIP, dstIIP.length() - 1);
-    boolean dstIIPIsQuota = FSDirectory.verifyIsQuota(srcIIP, srcIIP.length() - 1);
-    if (srcIIPIsQuota ) {
-      srcPolicyCounts = srcIIP.getLastINode().computeQuotaUsage(bsps);
-    }
-    if (dstIIPIsQuota){
-      dstPolicyCounts = srcIIP.getLastINode()
-          .computeQuotaUsage(bsps, dstParent.getStoragePolicyID(), false,
-              Snapshot.CURRENT_STATE_ID);
+    boolean srcIIPIsQuota = FSDirectory.verifyIsQuota(
+        srcIIP, srcIIP.length() - 1);
+    boolean dstIIPIsQuota = FSDirectory.verifyIsQuota(
+        dstIIP, dstIIP.length() - 1);
+    if (srcIIPIsQuota || dstIIPIsQuota) {
+      if (dstParent.getStoragePolicyID() ==
+          srcIIP.getLastINode().getStoragePolicyID()) {
+        srcPolicyCounts = srcIIP.getLastINode().computeQuotaUsage(bsps);
+        dstPolicyCounts = dstPolicyCounts.add(srcPolicyCounts);
+      } else {
+        srcPolicyCounts = srcIIP.getLastINode().computeQuotaUsage(bsps);
+        dstPolicyCounts = srcIIP.getLastINode()
+            .computeQuotaUsage(bsps, dstParent.getStoragePolicyID(), false,
+                Snapshot.CURRENT_STATE_ID);
+      }
     }
     if (dstIIPIsQuota) {
       verifyQuotaForRename(fsd, srcIIP, dstIIP, dstPolicyCounts);
@@ -451,7 +465,7 @@ class FSDirRenameOp {
     long removedNum = 0;
     try {
       if (dstInode != null) { // dst exists, remove it
-        removedNum = tx.removeDst(dstIIPIsQuota);
+        removedNum = tx.removeDst();
         if (removedNum != -1) {
           undoRemoveDst = true;
         }
@@ -741,15 +755,14 @@ class FSDirRenameOp {
       }
     }
 
-    long removeDst(boolean dstIIPIsQuota) {
+    long removeDst() {
       long removedNum = fsd.removeLastINode(dstIIP);
       if (removedNum != -1) {
-        if (dstIIPIsQuota) {
-          oldDstChild = dstIIP.getLastINode();
-          QuotaCounts counts = oldDstChild.computeQuotaUsage(fsd.getBlockStoragePolicySuite());
-          // update the quota count if necessary
-          fsd.updateCountForDelete(oldDstChild, dstIIP, counts);
-        }
+        oldDstChild = dstIIP.getLastINode();
+        QuotaCounts counts = oldDstChild.computeQuotaUsage(
+            fsd.getBlockStoragePolicySuite());
+        // update the quota count if necessary
+        fsd.updateCountForDelete(oldDstChild, dstIIP, counts);
         dstIIP = INodesInPath.replace(dstIIP, dstIIP.length() - 1, null);
       }
       return removedNum;
@@ -766,6 +779,10 @@ class FSDirRenameOp {
         withCount.getReferredINode().setLocalName(dstChildName);
         toDst = new INodeReference.DstReference(dstParent.asDirectory(),
             withCount, dstIIP.getLatestSnapshotId());
+        // the snapshot directory must recalculate the QuotaCount
+        counts = toDst.computeQuotaUsage(fsd.getBlockStoragePolicySuite(),
+                dstParent.getStoragePolicyID(),
+            false, Snapshot.CURRENT_STATE_ID);
       }
       return fsd.addLastINodeNoQuotaCheck(dstParentIIP, toDst, counts);
     }

@@ -559,16 +559,16 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
    * @return The subtree quota counts.
    */
 
-  public  QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
+  public QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
       byte blockStoragePolicyId, boolean useCache, int lastSnapshotId){
     QuotaCounts counts = new QuotaCounts.Builder().build();
-    return computeQuotaUsage(bsps,blockStoragePolicyId,useCache,lastSnapshotId, counts);
+    return computeQuotaUsage(bsps, blockStoragePolicyId,
+        useCache, lastSnapshotId, counts);
   }
 
-  public abstract QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
-                                                byte blockStoragePolicyId,
-                                                boolean useCache, int lastSnapshotId,
-                                                QuotaCounts counts);
+  public abstract QuotaCounts computeQuotaUsage(
+      BlockStoragePolicySuite bsps, byte blockStoragePolicyId,
+      boolean useCache, int lastSnapshotId, QuotaCounts counts);
 
   public final QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
       boolean useCache) {
