@@ -1092,7 +1092,7 @@ public class FSDirectory implements Closeable {
   }
 
   /**
-   * check that all parent directories have quotas set
+   * check that all parent directories have quotas set.
    */
   static boolean verifyIsQuota(INodesInPath iip, int pos) {
     for (int i = (Math.min(pos, iip.length()) - 1); i > 0; i--) {
@@ -1360,7 +1360,8 @@ public class FSDirectory implements Closeable {
    */
   @VisibleForTesting
   public INodesInPath addLastINode(INodesInPath existing, INode inode,
-      FsPermission modes, boolean checkQuota, QuotaCounts counts) throws QuotaExceededException {
+      FsPermission modes, boolean checkQuota, QuotaCounts counts)
+      throws QuotaExceededException {
     assert existing.getLastINode() != null &&
         existing.getLastINode().isDirectory();
 
@@ -1411,7 +1412,8 @@ public class FSDirectory implements Closeable {
     return INodesInPath.append(existing, inode, inode.getLocalNameBytes());
   }
 
-  INodesInPath addLastINodeNoQuotaCheck(INodesInPath existing, INode i, QuotaCounts counts) {
+  INodesInPath addLastINodeNoQuotaCheck(
+      INodesInPath existing, INode i, QuotaCounts counts) {
     try {
       // All callers do not have create modes to pass.
       return addLastINode(existing, i, null, false, counts);

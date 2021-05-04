@@ -41,12 +41,12 @@ public class TestRenameWithQuota {
 
   static final short NUM_DATANODES = 1;
 
-  private static final Path root = new Path("/");
-  private static final Path quota1 = new Path("/quota1");
-  private static final Path quota2 = new Path("/quota2");
-  private static final Path noQuota1 = new Path("/noQuota1");
-  private static final Path noQuota2 = new Path("/noQuota2");
-  private static final Path file0 = new Path("file0");
+  private static final Path ROOT = new Path("/");
+  private static final Path QUOTA1 = new Path("/quota1");
+  private static final Path QUOTA2 = new Path("/quota2");
+  private static final Path NO_QUOTA1 = new Path("/noQuota1");
+  private static final Path NO_QUOTA2 = new Path("/noQuota2");
+  private static final Path FILE0 = new Path("file0");
 
   private static final int FILE_SIZE = 1024;
   private static final int NAMESPACE_QUOTA = 1024 * 1024;
@@ -54,20 +54,17 @@ public class TestRenameWithQuota {
   private static final int DFS_REPLICATION = 1;
   private static final int DEFAULT_BLOCK_SIZE = 2048;
 
-  Configuration conf;
-  MiniDFSCluster cluster;
-  FSNamesystem fsn;
-  DistributedFileSystem hdfs;
+  private MiniDFSCluster cluster;
+  private DistributedFileSystem hdfs;
 
   @Before
   public void setUp() throws Exception {
-    conf = new Configuration();
+    Configuration conf = new Configuration();
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, DEFAULT_BLOCK_SIZE);
     conf.setLong(DFSConfigKeys.DFS_REPLICATION_KEY, DFS_REPLICATION);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_DATANODES)
         .build();
     cluster.waitActive();
-    fsn = cluster.getNamesystem();
     hdfs = cluster.getFileSystem();
   }
 
@@ -80,7 +77,7 @@ public class TestRenameWithQuota {
   }
 
   public void clear() throws IOException {
-    for (FileStatus fileStatus : hdfs.listStatus(root)) {
+    for (FileStatus fileStatus : hdfs.listStatus(ROOT)) {
       if (hdfs.exists(fileStatus.getPath())) {
         hdfs.delete(fileStatus.getPath(), true);
       }
@@ -92,64 +89,64 @@ public class TestRenameWithQuota {
   public void testRenameNoQuotaToQuota() throws Exception {
     // mkdir dir
     clear();
-    hdfs.mkdirs(noQuota1);
-    hdfs.mkdirs(quota1);
-    hdfs.setQuota(quota1, NAMESPACE_QUOTA, SPACE_QUOTA);
+    hdfs.mkdirs(NO_QUOTA1);
+    hdfs.mkdirs(QUOTA1);
+    hdfs.setQuota(QUOTA1, NAMESPACE_QUOTA, SPACE_QUOTA);
 
-    DFSTestUtil.createFile(hdfs, new Path(noQuota1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(NO_QUOTA1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
     // noQuota mv to quota
-    rename(new Path(noQuota1, file0), new Path(quota1, file0),
+    rename(new Path(NO_QUOTA1, FILE0), new Path(QUOTA1, FILE0),
         false, true, Options.Rename.NONE);
-    assertEquals(hdfs.getQuotaUsage(quota1).getSpaceConsumed(), FILE_SIZE);
-    assertEquals(hdfs.getQuotaUsage(root).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getSpaceConsumed(), FILE_SIZE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).getFileAndDirectoryCount(), 2);
-    assertEquals(hdfs.getQuotaUsage(root).getFileAndDirectoryCount(), 4);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getFileAndDirectoryCount(), 2);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getFileAndDirectoryCount(), 4);
 
     // rename over write
-    DFSTestUtil.createFile(hdfs, new Path(noQuota1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(NO_QUOTA1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
     // noQuota mv to quota
-    rename(new Path(noQuota1, file0), new Path(quota1, file0),
+    rename(new Path(NO_QUOTA1, FILE0), new Path(QUOTA1, FILE0),
         false, true, Options.Rename.OVERWRITE);
-    assertEquals(hdfs.getQuotaUsage(quota1).getSpaceConsumed(), FILE_SIZE);
-    assertEquals(hdfs.getQuotaUsage(root).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getSpaceConsumed(), FILE_SIZE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).getFileAndDirectoryCount(), 2);
-    assertEquals(hdfs.getQuotaUsage(root).getFileAndDirectoryCount(), 4);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getFileAndDirectoryCount(), 2);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getFileAndDirectoryCount(), 4);
   }
 
   @Test
   public void testRenameQuotaToNoQuota() throws Exception {
     // mkdir dir
     clear();
-    hdfs.mkdirs(noQuota1);
-    hdfs.mkdirs(quota1);
-    hdfs.setQuota(quota1, NAMESPACE_QUOTA, SPACE_QUOTA);
+    hdfs.mkdirs(NO_QUOTA1);
+    hdfs.mkdirs(QUOTA1);
+    hdfs.setQuota(QUOTA1, NAMESPACE_QUOTA, SPACE_QUOTA);
 
-    DFSTestUtil.createFile(hdfs, new Path(quota1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(QUOTA1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
     // mv quota to noQuota
-    rename(new Path(quota1, file0), new Path(noQuota1, file0),
+    rename(new Path(QUOTA1, FILE0), new Path(NO_QUOTA1, FILE0),
         false, true, Options.Rename.NONE);
-    assertEquals(hdfs.getQuotaUsage(quota1).getSpaceConsumed(), 0);
-    assertEquals(hdfs.getQuotaUsage(root).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getSpaceConsumed(), 0);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getSpaceConsumed(), FILE_SIZE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).getFileAndDirectoryCount(), 1);
-    assertEquals(hdfs.getQuotaUsage(root).getFileAndDirectoryCount(), 4);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getFileAndDirectoryCount(), 1);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getFileAndDirectoryCount(), 4);
     // rename over write
-    DFSTestUtil.createFile(hdfs, new Path(quota1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(QUOTA1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
     // mv quota to noQuota
-    rename(new Path(quota1, file0), new Path(noQuota1, file0),
+    rename(new Path(QUOTA1, FILE0), new Path(NO_QUOTA1, FILE0),
         false, true, Options.Rename.OVERWRITE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).getSpaceConsumed(), 0);
-    assertEquals(hdfs.getQuotaUsage(root).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getSpaceConsumed(), 0);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getSpaceConsumed(), FILE_SIZE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).getFileAndDirectoryCount(), 1);
-    assertEquals(hdfs.getQuotaUsage(root).getFileAndDirectoryCount(), 4);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getFileAndDirectoryCount(), 1);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getFileAndDirectoryCount(), 4);
 
   }
 
@@ -157,115 +154,115 @@ public class TestRenameWithQuota {
   public void testRenameNoQuotaToNoQuota() throws Exception {
     // mkdir dir
     clear();
-    hdfs.mkdirs(noQuota1);
-    hdfs.mkdirs(noQuota2);
+    hdfs.mkdirs(NO_QUOTA1);
+    hdfs.mkdirs(NO_QUOTA2);
 
-    DFSTestUtil.createFile(hdfs, new Path(noQuota1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(NO_QUOTA1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
 
     // noQuota mv to noQuota
-    rename(new Path(noQuota1, file0), new Path(noQuota2, file0),
+    rename(new Path(NO_QUOTA1, FILE0), new Path(NO_QUOTA2, FILE0),
         false, true, Options.Rename.NONE);
 
-    assertEquals(hdfs.getQuotaUsage(root).getSpaceConsumed(), FILE_SIZE);
-    assertEquals(hdfs.getQuotaUsage(root).getFileAndDirectoryCount(), 4);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getFileAndDirectoryCount(), 4);
     // rename over write
-    DFSTestUtil.createFile(hdfs, new Path(noQuota1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(NO_QUOTA1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
     // noQuota mv to Quota
-    rename(new Path(noQuota1, file0), new Path(noQuota2, file0),
+    rename(new Path(NO_QUOTA1, FILE0), new Path(NO_QUOTA2, FILE0),
         false, true, Options.Rename.OVERWRITE);
-    assert hdfs.exists(new Path(noQuota2, file0));
-    assertFalse(hdfs.exists(new Path(noQuota1, file0)));
-    assertEquals(hdfs.getQuotaUsage(root).getSpaceConsumed(), FILE_SIZE);
-    assertEquals(hdfs.getQuotaUsage(root).getFileAndDirectoryCount(), 4);
+    assert hdfs.exists(new Path(NO_QUOTA2, FILE0));
+    assertFalse(hdfs.exists(new Path(NO_QUOTA1, FILE0)));
+    assertEquals(hdfs.getQuotaUsage(ROOT).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getFileAndDirectoryCount(), 4);
   }
 
   @Test
   public void testRenameQuotaToQuota() throws Exception {
     // mkdir dir
     clear();
-    hdfs.mkdirs(quota1);
-    hdfs.mkdirs(quota2);
-    hdfs.setQuota(quota1, NAMESPACE_QUOTA, SPACE_QUOTA);
-    hdfs.setQuota(quota2, NAMESPACE_QUOTA, SPACE_QUOTA);
+    hdfs.mkdirs(QUOTA1);
+    hdfs.mkdirs(QUOTA2);
+    hdfs.setQuota(QUOTA1, NAMESPACE_QUOTA, SPACE_QUOTA);
+    hdfs.setQuota(QUOTA2, NAMESPACE_QUOTA, SPACE_QUOTA);
 
-    DFSTestUtil.createFile(hdfs, new Path(quota1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(QUOTA1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
     // noQuota mv to quota
-    rename(new Path(quota1, file0), new Path(quota2, file0),
+    rename(new Path(QUOTA1, FILE0), new Path(QUOTA2, FILE0),
         false, true, Options.Rename.NONE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).getSpaceConsumed(), 0);
-    assertEquals(hdfs.getQuotaUsage(quota2).getSpaceConsumed(), FILE_SIZE);
-    assertEquals(hdfs.getQuotaUsage(root).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getSpaceConsumed(), 0);
+    assertEquals(hdfs.getQuotaUsage(QUOTA2).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getSpaceConsumed(), FILE_SIZE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).getFileAndDirectoryCount(), 1);
-    assertEquals(hdfs.getQuotaUsage(quota2).getFileAndDirectoryCount(), 2);
-    assertEquals(hdfs.getQuotaUsage(root).getFileAndDirectoryCount(), 4);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getFileAndDirectoryCount(), 1);
+    assertEquals(hdfs.getQuotaUsage(QUOTA2).getFileAndDirectoryCount(), 2);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getFileAndDirectoryCount(), 4);
 
     // rename over write
-    DFSTestUtil.createFile(hdfs, new Path(quota1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(QUOTA1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
     // noQuota mv to quota
-    rename(new Path(quota1, file0), new Path(quota2, file0),
+    rename(new Path(QUOTA1, FILE0), new Path(QUOTA2, FILE0),
         false, true, Options.Rename.OVERWRITE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).getSpaceConsumed(), 0);
-    assertEquals(hdfs.getQuotaUsage(quota2).getSpaceConsumed(), FILE_SIZE);
-    assertEquals(hdfs.getQuotaUsage(root).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getSpaceConsumed(), 0);
+    assertEquals(hdfs.getQuotaUsage(QUOTA2).getSpaceConsumed(), FILE_SIZE);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getSpaceConsumed(), FILE_SIZE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).getFileAndDirectoryCount(), 1);
-    assertEquals(hdfs.getQuotaUsage(quota2).getFileAndDirectoryCount(), 2);
-    assertEquals(hdfs.getQuotaUsage(root).getFileAndDirectoryCount(), 4);
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).getFileAndDirectoryCount(), 1);
+    assertEquals(hdfs.getQuotaUsage(QUOTA2).getFileAndDirectoryCount(), 2);
+    assertEquals(hdfs.getQuotaUsage(ROOT).getFileAndDirectoryCount(), 4);
   }
 
   @Test
   public void testRenameStorageType() throws Exception {
     clear();
-    hdfs.mkdirs(quota1);
-    hdfs.mkdirs(quota2);
-    hdfs.setStoragePolicy(quota1, HdfsConstants.HOT_STORAGE_POLICY_NAME);
-    hdfs.setStoragePolicy(quota2, HdfsConstants.ALLSSD_STORAGE_POLICY_NAME);
-    hdfs.setQuotaByStorageType(quota1, StorageType.DISK, SPACE_QUOTA);
-    hdfs.setQuotaByStorageType(quota2, StorageType.SSD, SPACE_QUOTA);
+    hdfs.mkdirs(QUOTA1);
+    hdfs.mkdirs(QUOTA2);
+    hdfs.setStoragePolicy(QUOTA1, HdfsConstants.HOT_STORAGE_POLICY_NAME);
+    hdfs.setStoragePolicy(QUOTA2, HdfsConstants.ALLSSD_STORAGE_POLICY_NAME);
+    hdfs.setQuotaByStorageType(QUOTA1, StorageType.DISK, SPACE_QUOTA);
+    hdfs.setQuotaByStorageType(QUOTA2, StorageType.SSD, SPACE_QUOTA);
 
-    DFSTestUtil.createFile(hdfs, new Path(quota1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(QUOTA1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).
         getTypeConsumed(StorageType.DISK), FILE_SIZE);
-    rename(new Path(quota1, file0), new Path(quota2, file0),
+    rename(new Path(QUOTA1, FILE0), new Path(QUOTA2, FILE0),
         false, true, Options.Rename.NONE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).
         getTypeConsumed(StorageType.DISK), 0);
-    assertEquals(hdfs.getQuotaUsage(quota2).
+    assertEquals(hdfs.getQuotaUsage(QUOTA2).
         getTypeConsumed(StorageType.SSD), FILE_SIZE);
 
-    assertEquals(hdfs.getQuotaUsage(root).
+    assertEquals(hdfs.getQuotaUsage(ROOT).
         getTypeConsumed(StorageType.DISK), 0);
-    assertEquals(hdfs.getQuotaUsage(root).
+    assertEquals(hdfs.getQuotaUsage(ROOT).
         getTypeConsumed(StorageType.SSD), FILE_SIZE);
 
     // rename over write
-    DFSTestUtil.createFile(hdfs, new Path(quota1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(QUOTA1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).
         getTypeConsumed(StorageType.DISK), FILE_SIZE);
 
-    rename(new Path(quota1, file0), new Path(quota2, file0),
+    rename(new Path(QUOTA1, FILE0), new Path(QUOTA2, FILE0),
         false, true, Options.Rename.OVERWRITE);
 
-    assertEquals(hdfs.getQuotaUsage(quota1).
+    assertEquals(hdfs.getQuotaUsage(QUOTA1).
         getTypeConsumed(StorageType.DISK), 0);
-    assertEquals(hdfs.getQuotaUsage(quota2).
+    assertEquals(hdfs.getQuotaUsage(QUOTA2).
         getTypeConsumed(StorageType.SSD), FILE_SIZE);
 
-    assertEquals(hdfs.getQuotaUsage(root).
+    assertEquals(hdfs.getQuotaUsage(ROOT).
         getTypeConsumed(StorageType.DISK), 0);
-    assertEquals(hdfs.getQuotaUsage(root).
+    assertEquals(hdfs.getQuotaUsage(ROOT).
         getTypeConsumed(StorageType.SSD), FILE_SIZE);
   }
 
@@ -279,7 +276,7 @@ public class TestRenameWithQuota {
     final Path sub1 = new Path(parent, "sub1");
     hdfs.mkdirs(sub1);
 
-    DFSTestUtil.createFile(hdfs, new Path(sub1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(sub1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
 
     hdfs.allowSnapshot(parent);
@@ -288,21 +285,22 @@ public class TestRenameWithQuota {
     final Path sub2 = new Path(parent, "sub2");
     hdfs.mkdirs(sub2);
     assertEquals(hdfs.getQuotaUsage(parent).getFileAndDirectoryCount(), 4);
-    // mv /parent/sub1/file0 to /parent/sub2/file0
-    rename(new Path(sub1, file0), new Path(sub2, file0),
+    // mv /parent/sub1/FILE0 to /parent/sub2/FILE0
+    rename(new Path(sub1, FILE0), new Path(sub2, FILE0),
         false, true, Options.Rename.NONE);
 
     assertEquals(hdfs.getQuotaUsage(parent).getFileAndDirectoryCount(), 5);
     // rename overwrite
-    DFSTestUtil.createFile(hdfs, new Path(sub1, file0),
+    DFSTestUtil.createFile(hdfs, new Path(sub1, FILE0),
         FILE_SIZE, (short) DFS_REPLICATION, 0);
-    rename(new Path(sub1, file0), new Path(sub2, file0),
+    rename(new Path(sub1, FILE0), new Path(sub2, FILE0),
         false, true, Options.Rename.OVERWRITE);
     assertEquals(hdfs.getQuotaUsage(parent).getFileAndDirectoryCount(), 5);
   }
 
-  public void rename(Path src, Path dst, boolean srcExists,
-                     boolean dstExists, Options.Rename... options) throws IOException {
+  public void rename(
+      Path src, Path dst, boolean srcExists, boolean dstExists,
+      Options.Rename... options) throws IOException {
     try {
       hdfs.rename(src, dst, options);
     } finally {

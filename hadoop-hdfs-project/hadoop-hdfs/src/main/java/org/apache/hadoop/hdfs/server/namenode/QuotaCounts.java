@@ -47,7 +47,7 @@ public class QuotaCounts {
   final static EnumCounters<StorageType> STORAGE_TYPE_DEFAULT =
       new ConstEnumCounters<>(StorageType.class, 0);
 
-  boolean isConstEnumCounters;
+  private final boolean isConstEnumCounters;
   /**
    * Modify counter with action. If the counter is ConstEnumCounters, copy all
    * the values of it to a new EnumCounters object, and modify the new obj.
