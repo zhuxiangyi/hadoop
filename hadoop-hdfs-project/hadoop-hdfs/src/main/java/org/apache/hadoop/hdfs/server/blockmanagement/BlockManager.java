@@ -434,7 +434,7 @@ public class BlockManager implements BlockStatsMXBean {
 
   /**
    * The blocks of deleted files are put into the queue,
-   * and the cleanup thread processes these blocks periodically
+   * and the cleanup thread processes these blocks periodically.
    */
   private final ConcurrentLinkedQueue<List<BlockInfo>> markedDeleteQueue;
 
@@ -749,7 +749,8 @@ public class BlockManager implements BlockStatsMXBean {
     datanodeManager.activate(conf);
     this.redundancyThread.setName("RedundancyMonitor");
     this.redundancyThread.start();
-    this.markedDeleteBlockScrubberThread.setName("MarkedDeleteBlockScrubberThread");
+    this.markedDeleteBlockScrubberThread.
+        setName("MarkedDeleteBlockScrubberThread");
     this.markedDeleteBlockScrubberThread.start();
     this.blockReportThread.start();
     mxBeanName = MBeans.register("NameNode", "BlockStats", this);
