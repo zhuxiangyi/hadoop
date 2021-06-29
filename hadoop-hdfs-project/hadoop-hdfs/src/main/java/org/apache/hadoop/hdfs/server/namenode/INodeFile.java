@@ -875,8 +875,7 @@ public class INodeFile extends INodeWithAdditionalFields
   public final QuotaCounts computeQuotaUsageWithStriped(
       BlockStoragePolicy bsp, QuotaCounts counts) {
     counts.addNameSpace(1);
-    counts.add(storagespaceConsumed(bsp, counts));
-    return counts;
+    return storagespaceConsumed(bsp, counts);
   }
 
   @Override
