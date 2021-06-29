@@ -130,9 +130,9 @@ public class FileWithSnapshotFeature implements INode.Feature {
       }
       final BlockStoragePolicy policy = reclaimContext.storagePolicySuite()
           .getPolicy(storagePolicyId);
-      QuotaCounts old = file.storagespaceConsumed(policy);
+      QuotaCounts old = file.storagespaceConsumed(policy, null);
       collectBlocksAndClear(reclaimContext, file);
-      QuotaCounts current = file.storagespaceConsumed(policy);
+      QuotaCounts current = file.storagespaceConsumed(policy, null);
       reclaimContext.quotaDelta().add(old.subtract(current));
     } else { // delete the snapshot
       priorSnapshotId = getDiffs().updatePrior(snapshotId, priorSnapshotId);
@@ -193,7 +193,7 @@ public class FileWithSnapshotFeature implements INode.Feature {
         AclStorage.removeAclFeature(aclFeature);
       }
     } else {
-      oldCounts = file.storagespaceConsumed(null);
+      oldCounts = file.storagespaceConsumed(null, null);
     }
 
     getDiffs().combineAndCollectSnapshotBlocks(reclaimContext, file, removed);
@@ -207,7 +207,7 @@ public class FileWithSnapshotFeature implements INode.Feature {
         }
       }
     }
-    QuotaCounts current = file.storagespaceConsumed(bsp);
+    QuotaCounts current = file.storagespaceConsumed(bsp, null);
     reclaimContext.quotaDelta().add(oldCounts.subtract(current));
   }
 

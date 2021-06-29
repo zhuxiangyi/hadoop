@@ -42,10 +42,11 @@ public final class DirectoryWithQuotaFeature implements INode.Feature {
     private QuotaCounts usage;
 
     public Builder() {
-      this.quota = new QuotaCounts.Builder().nameSpace(DEFAULT_NAMESPACE_QUOTA).
+      this.quota = new QuotaCounts.Builder(true).
+          nameSpace(DEFAULT_NAMESPACE_QUOTA).
           storageSpace(DEFAULT_STORAGE_SPACE_QUOTA).
           typeSpaces(DEFAULT_STORAGE_SPACE_QUOTA).build();
-      this.usage = new QuotaCounts.Builder().nameSpace(1).build();
+      this.usage = new QuotaCounts.Builder(true).nameSpace(1).build();
     }
 
     public Builder nameSpaceQuota(long nameSpaceQuota) {
@@ -80,7 +81,7 @@ public final class DirectoryWithQuotaFeature implements INode.Feature {
 
   /** @return the quota set or -1 if it is not set. */
   QuotaCounts getQuota() {
-    return new QuotaCounts.Builder().quotaCount(this.quota).build();
+    return new QuotaCounts.Builder(true).quotaCount(this.quota).build();
   }
 
   /** Set this directory's quota
@@ -183,7 +184,7 @@ public final class DirectoryWithQuotaFeature implements INode.Feature {
 
   /** @return the namespace and storagespace and typespace consumed. */
   public QuotaCounts getSpaceConsumed() {
-    return new QuotaCounts.Builder().quotaCount(usage).build();
+    return new QuotaCounts.Builder(true).quotaCount(usage).build();
   }
 
   /** Verify if the namespace quota is violated after applying delta. */

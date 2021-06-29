@@ -206,8 +206,10 @@ public class TestStripedINodeFile {
     //  a. <Cell Size> * (<Num Stripes> - 1) * <Total Block Num> = 0
     //  b. <Num Bytes> % <Num Bytes per Stripes> = 1
     //  c. <Last Stripe Length> * <Parity Block Num> = 1 * 3
-    assertEquals(4, inf.storagespaceConsumedStriped().getStorageSpace());
-    assertEquals(4, inf.storagespaceConsumed(defaultPolicy).getStorageSpace());
+    assertEquals(4, inf.storagespaceConsumedStriped(
+        new QuotaCounts.Builder().build()).getStorageSpace());
+    assertEquals(4, inf.storagespaceConsumed(
+        defaultPolicy, null).getStorageSpace());
   }
 
   @Test
@@ -225,8 +227,9 @@ public class TestStripedINodeFile {
     inf.addBlock(blockInfoStriped1);
     inf.addBlock(blockInfoStriped2);
     // This is the double size of one block in above case.
-    assertEquals(4 * 2, inf.storagespaceConsumedStriped().getStorageSpace());
-    assertEquals(4 * 2, inf.storagespaceConsumed(defaultPolicy).getStorageSpace());
+    assertEquals(4 * 2, inf.storagespaceConsumedStriped(
+        new QuotaCounts.Builder().build()).getStorageSpace());
+    assertEquals(4 * 2, inf.storagespaceConsumed(defaultPolicy,null).getStorageSpace());
   }
 
   @Test

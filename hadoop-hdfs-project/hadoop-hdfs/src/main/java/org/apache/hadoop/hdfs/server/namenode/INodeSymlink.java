@@ -89,9 +89,11 @@ public class INodeSymlink extends INodeWithAdditionalFields {
   }
 
   @Override
-  public QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
-      byte blockStoragePolicyId, boolean useCache, int lastSnapshotId) {
-    return new QuotaCounts.Builder().nameSpace(1).build();
+  public QuotaCounts computeQuotaUsage(
+      BlockStoragePolicySuite bsps, byte blockStoragePolicyId,
+      boolean useCache, int lastSnapshotId, QuotaCounts counts) {
+    counts.addNameSpace(1);
+    return counts;
   }
 
   @Override
