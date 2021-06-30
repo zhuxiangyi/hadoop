@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -47,6 +47,8 @@ public class QuotaCounts {
   final static EnumCounters<StorageType> STORAGE_TYPE_DEFAULT =
       new ConstEnumCounters<>(StorageType.class, 0);
 
+  private final boolean isConstEnumCounters;
+
   /**
    * Modify counter with action. If the counter is ConstEnumCounters, copy all
    * the values of it to a new EnumCounters object, and modify the new obj.
@@ -79,6 +81,7 @@ public class QuotaCounts {
   public static class Builder {
     private EnumCounters<Quota> nsSsCounts;
     private EnumCounters<StorageType> tsCounts;
+    private boolean isConstEnumCounters;
 
     public Builder() {
       this.nsSsCounts = new EnumCounters<>(Quota.class, 0);
@@ -86,21 +89,20 @@ public class QuotaCounts {
     }
 
     public Builder(boolean flag) {
-      if (flag){
-        this.nsSsCounts = QUOTA_DEFAULT;
-        this.tsCounts = STORAGE_TYPE_DEFAULT;
-      }
+      this.nsSsCounts = QUOTA_DEFAULT;
+      this.tsCounts = STORAGE_TYPE_DEFAULT;
+      this.isConstEnumCounters = flag;
     }
 
     public Builder nameSpace(long val) {
-      nsSsCounts =
-          setQuotaCounter(nsSsCounts, Quota.NAMESPACE, Quota.STORAGESPACE, val);
+      nsSsCounts = setQuotaCounter(nsSsCounts, Quota.NAMESPACE,
+          Quota.STORAGESPACE, val, isConstEnumCounters);
       return this;
     }
 
     public Builder storageSpace(long val) {
-      nsSsCounts =
-          setQuotaCounter(nsSsCounts, Quota.STORAGESPACE, Quota.NAMESPACE, val);
+      nsSsCounts = setQuotaCounter(nsSsCounts, Quota.STORAGESPACE,
+          Quota.NAMESPACE, val, isConstEnumCounters);
       return this;
     }
 
@@ -149,6 +151,7 @@ public class QuotaCounts {
   private QuotaCounts(Builder builder) {
     this.nsSsCounts = builder.nsSsCounts;
     this.tsCounts = builder.tsCounts;
+    this.isConstEnumCounters = builder.isConstEnumCounters;
   }
 
   public QuotaCounts add(QuotaCounts that) {
@@ -179,7 +182,8 @@ public class QuotaCounts {
   }
 
   public void checkCopyEnumCounter(QuotaCounts counts){
-    if (counts.tsCounts instanceof ConstEnumCounters){
+    if (counts.tsCounts instanceof ConstEnumCounters ||
+        counts.nsSsCounts instanceof ConstEnumCounters) {
       counts.nsSsCounts = this.nsSsCounts.deepCopyEnumCounter();
       counts.tsCounts = this.tsCounts.deepCopyEnumCounter();
     }
@@ -190,28 +194,26 @@ public class QuotaCounts {
   }
 
   public void setNameSpace(long nameSpaceCount) {
-    nsSsCounts =
-        setQuotaCounter(nsSsCounts, Quota.NAMESPACE, Quota.STORAGESPACE,
-            nameSpaceCount);
+    nsSsCounts = setQuotaCounter(nsSsCounts, Quota.NAMESPACE,
+        Quota.STORAGESPACE, nameSpaceCount, isConstEnumCounters);
   }
 
   public void addNameSpace(long nsDelta) {
     nsSsCounts = modify(nsSsCounts, ec -> ec.add(Quota.NAMESPACE, nsDelta));
   }
 
-  public long getStorageSpace(){
+  public long getStorageSpace() {
     return nsSsCounts.get(Quota.STORAGESPACE);
   }
 
   public void setStorageSpace(long spaceCount) {
-    nsSsCounts =
-        setQuotaCounter(nsSsCounts, Quota.STORAGESPACE, Quota.NAMESPACE,
-            spaceCount);
+    nsSsCounts = setQuotaCounter(nsSsCounts, Quota.STORAGESPACE,
+        Quota.NAMESPACE, spaceCount, isConstEnumCounters);
   }
 
   public void addStorageSpace(long dsDelta) {
     checkCopyEnumCounter(this);
-    this.nsSsCounts.add(Quota.STORAGESPACE,dsDelta);
+    this.nsSsCounts.add(Quota.STORAGESPACE, dsDelta);
   }
 
   public EnumCounters<StorageType> getTypeSpaces() {
@@ -235,7 +237,7 @@ public class QuotaCounts {
 
   void setTypeSpace(StorageType type, long spaceCount) {
     checkCopyEnumCounter(this);
-    this.tsCounts.set(type,spaceCount);
+    this.tsCounts.set(type, spaceCount);
   }
 
   public void addTypeSpace(StorageType type, long delta) {
@@ -243,7 +245,7 @@ public class QuotaCounts {
   }
 
   public boolean anyNsSsCountGreaterOrEqual(long val) {
-  if (nsSsCounts == QUOTA_DEFAULT) {
+    if (nsSsCounts == QUOTA_DEFAULT) {
       return val <= 0;
     } else if (nsSsCounts == QUOTA_RESET) {
       return val <= HdfsConstants.QUOTA_RESET;
@@ -272,11 +274,12 @@ public class QuotaCounts {
    */
   private static EnumCounters<Quota> setQuotaCounter(
       EnumCounters<Quota> inputCounts, Quota quotaToSet, Quota otherQuota,
-      long val) {
-    if (val == HdfsConstants.QUOTA_RESET
+      long val, boolean isConstEnumCounters) {
+    if (isConstEnumCounters && val == HdfsConstants.QUOTA_RESET
         && inputCounts.get(otherQuota) == HdfsConstants.QUOTA_RESET) {
       return QUOTA_RESET;
-    } else if (val == 0 && inputCounts.get(otherQuota) == 0) {
+    } else if (isConstEnumCounters && val == 0
+        && inputCounts.get(otherQuota) == 0) {
       return QUOTA_DEFAULT;
     } else {
       return modify(inputCounts, ec -> ec.set(quotaToSet, val));
@@ -297,7 +300,7 @@ public class QuotaCounts {
     } else if (!(obj instanceof QuotaCounts)) {
       return false;
     }
-    final QuotaCounts that = (QuotaCounts)obj;
+    final QuotaCounts that = (QuotaCounts) obj;
     return this.nsSsCounts.equals(that.nsSsCounts)
         && this.tsCounts.equals(that.tsCounts);
   }

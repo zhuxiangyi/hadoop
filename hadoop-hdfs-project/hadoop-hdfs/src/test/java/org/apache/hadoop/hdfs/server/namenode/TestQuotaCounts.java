@@ -19,10 +19,12 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.util.ConstEnumCounters;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertFalse;
 
 /**
  * Test QuotaCounts.
@@ -31,7 +33,7 @@ public class TestQuotaCounts {
   @Test
   public void testBuildConstEnumCounters() throws Exception {
     QuotaCounts qc =
-        new QuotaCounts.Builder().nameSpace(HdfsConstants.QUOTA_RESET)
+        new QuotaCounts.Builder(true).nameSpace(HdfsConstants.QUOTA_RESET)
             .storageSpace(HdfsConstants.QUOTA_RESET).build();
     // compare the references
     assertSame(QuotaCounts.QUOTA_RESET, qc.nsSsCounts);
@@ -45,91 +47,127 @@ public class TestQuotaCounts {
   }
 
   @Test
+  public void testBuildEnumCounters() throws Exception {
+    QuotaCounts qc =
+        new QuotaCounts.Builder().nameSpace(HdfsConstants.QUOTA_RESET)
+            .storageSpace(HdfsConstants.QUOTA_RESET).build();
+    // compare the references
+    assertFalse(qc.tsCounts instanceof ConstEnumCounters);
+    assertFalse(qc.nsSsCounts instanceof ConstEnumCounters);
+    // compare the values
+    assertEquals(HdfsConstants.QUOTA_RESET, qc.getNameSpace());
+    assertEquals(HdfsConstants.QUOTA_RESET, qc.getStorageSpace());
+    for (StorageType st : StorageType.values()) {
+      assertEquals(0, qc.getTypeSpace(st));
+    }
+  }
+
+  @Test
   public void testAddSpace() throws Exception {
-    QuotaCounts qc = new QuotaCounts.Builder().build();
-    qc.addNameSpace(1);
-    qc.addStorageSpace(1024);
-    assertEquals(1, qc.getNameSpace());
-    assertEquals(1024, qc.getStorageSpace());
+    for (QuotaCounts qc : getQuotaCount()) {
+      qc.addNameSpace(1);
+      qc.addStorageSpace(1024);
+      assertEquals(1, qc.getNameSpace());
+      assertEquals(1024, qc.getStorageSpace());
+    }
   }
 
   @Test
   public void testAdd() throws Exception {
-    QuotaCounts qc1 = new QuotaCounts.Builder().build();
     QuotaCounts qc2 = new QuotaCounts.Builder().nameSpace(1).storageSpace(512)
         .typeSpaces(5).build();
-    qc1.add(qc2);
-    assertEquals(1, qc1.getNameSpace());
-    assertEquals(512, qc1.getStorageSpace());
-    for (StorageType type : StorageType.values()) {
-      assertEquals(5, qc1.getTypeSpace(type));
+    for (QuotaCounts qc1 : getQuotaCount()) {
+      qc1.add(qc2);
+      assertEquals(1, qc1.getNameSpace());
+      assertEquals(512, qc1.getStorageSpace());
+      for (StorageType type : StorageType.values()) {
+        assertEquals(5, qc1.getTypeSpace(type));
+      }
     }
   }
 
   @Test
   public void testAddTypeSpaces() throws Exception {
-    QuotaCounts qc = new QuotaCounts.Builder().build();
-    for (StorageType t : StorageType.values()) {
-      qc.addTypeSpace(t, 10);
-    }
-    for (StorageType type : StorageType.values()) {
-      assertEquals(10, qc.getTypeSpace(type));
+    for (QuotaCounts qc : getQuotaCount()) {
+      for (StorageType t : StorageType.values()) {
+        qc.addTypeSpace(t, 10);
+      }
+      for (StorageType type : StorageType.values()) {
+        assertEquals(10, qc.getTypeSpace(type));
+      }
     }
   }
 
   @Test
   public void testSubtract() throws Exception {
-    QuotaCounts qc1 = new QuotaCounts.Builder().build();
     QuotaCounts qc2 = new QuotaCounts.Builder().nameSpace(1).storageSpace(512)
         .typeSpaces(5).build();
-    qc1.subtract(qc2);
-    assertEquals(-1, qc1.getNameSpace());
-    assertEquals(-512, qc1.getStorageSpace());
-    for (StorageType type : StorageType.values()) {
-      assertEquals(-5, qc1.getTypeSpace(type));
+    for (QuotaCounts qc1 : getQuotaCount()) {
+      qc1.subtract(qc2);
+      assertEquals(-1, qc1.getNameSpace());
+      assertEquals(-512, qc1.getStorageSpace());
+      for (StorageType type : StorageType.values()) {
+        assertEquals(-5, qc1.getTypeSpace(type));
+      }
     }
   }
 
   @Test
   public void testSetTypeSpaces() throws Exception {
-    QuotaCounts qc1 = new QuotaCounts.Builder().build();
     QuotaCounts qc2 = new QuotaCounts.Builder().nameSpace(1).storageSpace(512)
         .typeSpaces(5).build();
-    qc1.setTypeSpaces(qc2.getTypeSpaces());
-    for (StorageType t : StorageType.values()) {
-      assertEquals(qc2.getTypeSpace(t), qc1.getTypeSpace(t));
-    }
+    for (QuotaCounts qc1 : getQuotaCount()) {
+      qc1.setTypeSpaces(qc2.getTypeSpaces());
+      for (StorageType t : StorageType.values()) {
+        assertEquals(qc2.getTypeSpace(t), qc1.getTypeSpace(t));
+      }
 
-    // test ConstEnumCounters
-    qc1.setTypeSpaces(QuotaCounts.STORAGE_TYPE_RESET);
-    assertSame(QuotaCounts.STORAGE_TYPE_RESET, qc1.tsCounts);
+      // test ConstEnumCounters
+      qc1.setTypeSpaces(QuotaCounts.STORAGE_TYPE_RESET);
+      assertSame(QuotaCounts.STORAGE_TYPE_RESET, qc1.tsCounts);
+    }
   }
 
   @Test
   public void testSetSpaces() {
-    QuotaCounts qc = new QuotaCounts.Builder().build();
-    qc.setNameSpace(10);
-    qc.setStorageSpace(1024);
-    assertEquals(10, qc.getNameSpace());
-    assertEquals(1024, qc.getStorageSpace());
+    getQuotaCount();
+    for (QuotaCounts qc : getQuotaCount()) {
+      qc.setNameSpace(10);
+      qc.setStorageSpace(1024);
+      assertEquals(10, qc.getNameSpace());
+      assertEquals(1024, qc.getStorageSpace());
 
-    // test ConstEnumCounters
-    qc.setNameSpace(HdfsConstants.QUOTA_RESET);
-    qc.setStorageSpace(HdfsConstants.QUOTA_RESET);
-    assertSame(QuotaCounts.QUOTA_RESET, qc.nsSsCounts);
+      // test ConstEnumCounters
+      qc.setNameSpace(HdfsConstants.QUOTA_RESET);
+      qc.setStorageSpace(HdfsConstants.QUOTA_RESET);
+      if (qc.nsSsCounts instanceof ConstEnumCounters) {
+        assertSame(QuotaCounts.QUOTA_RESET, qc.nsSsCounts);
+      }
+    }
   }
 
   @Test
   public void testNegation() throws Exception {
-    QuotaCounts qc = new QuotaCounts.Builder()
-        .nameSpace(HdfsConstants.QUOTA_RESET)
-        .storageSpace(HdfsConstants.QUOTA_RESET)
-        .typeSpaces(HdfsConstants.QUOTA_RESET).build();
-    qc = qc.negation();
-    assertEquals(1, qc.getNameSpace());
-    assertEquals(1, qc.getStorageSpace());
-    for (StorageType t : StorageType.values()) {
-      assertEquals(1, qc.getTypeSpace(t));
+    getQuotaCount();
+    for (QuotaCounts qc : getQuotaCount()) {
+      qc.setNameSpace(HdfsConstants.QUOTA_RESET);
+      qc.setStorageSpace(HdfsConstants.QUOTA_RESET);
+      for (StorageType t : StorageType.values()) {
+        qc.setTypeSpace(t, HdfsConstants.QUOTA_RESET);
+      }
+      qc = qc.negation();
+      assertEquals(1, qc.getNameSpace());
+      assertEquals(1, qc.getStorageSpace());
+      for (StorageType t : StorageType.values()) {
+        assertEquals(1, qc.getTypeSpace(t));
+      }
     }
+  }
+
+  public QuotaCounts[] getQuotaCount() {
+    QuotaCounts[] qt = new QuotaCounts[2];
+    qt[0] = new QuotaCounts.Builder().build();
+    qt[1] = new QuotaCounts.Builder(true).build();
+    return qt;
   }
 }

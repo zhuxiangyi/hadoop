@@ -1038,13 +1038,13 @@ public class INodeFile extends INodeWithAdditionalFields
 
   public final QuotaCounts storagespaceConsumedContiguous(
       BlockStoragePolicy bsp, QuotaCounts counts) {
-    final Iterable<BlockInfo> blocks;
+    final BlockInfo[] blocks;
+    Set<BlockInfo> allBlocks = null;
     FileWithSnapshotFeature sf = getFileWithSnapshotFeature();
-    if (sf == null) {
-      blocks = Arrays.asList(getBlocks());
-    } else {
+    blocks = getBlocks();
+    if (sf != null){
       // Collect all distinct blocks
-      Set<BlockInfo> allBlocks = new HashSet<>(Arrays.asList(getBlocks()));
+      allBlocks = new HashSet<>(Arrays.asList(blocks));
       DiffList<FileDiff> diffs = sf.getDiffs().asList();
       for(FileDiff diff : diffs) {
         BlockInfo[] diffBlocks = diff.getBlocks();
@@ -1052,24 +1052,39 @@ public class INodeFile extends INodeWithAdditionalFields
           allBlocks.addAll(Arrays.asList(diffBlocks));
         }
       }
-      blocks = allBlocks;
     }
 
     final short replication = getPreferredBlockReplication();
-    for (BlockInfo b : blocks) {
-      long blockSize = b.isComplete() ? b.getNumBytes() :
-          getPreferredBlockSize();
-      counts.addStorageSpace(blockSize * replication);
-      if (bsp != null) {
-        List<StorageType> types = bsp.chooseStorageTypes(replication);
-        for (StorageType t : types) {
-          if (t.supportTypeQuota()) {
-            counts.addTypeSpace(t, blockSize);
-          }
-        }
+    if (allBlocks != null) {
+      for (BlockInfo b : allBlocks) {
+        getBlockStorageSpace(b, bsp, counts, replication);
+      }
+    } else {
+      for (BlockInfo b : blocks) {
+        getBlockStorageSpace(b, bsp, counts, replication);
       }
     }
     return counts;
+  }
+
+  /**
+   * Get the used space of the storage type of
+   * a block and add it to QuotaCounts.
+   */
+  public void getBlockStorageSpace(
+      BlockInfo b, BlockStoragePolicy bsp, QuotaCounts counts,
+      short replication) {
+    long blockSize = b.isComplete() ? b.getNumBytes() :
+        getPreferredBlockSize();
+    counts.addStorageSpace(blockSize * replication);
+    if (bsp != null) {
+      List<StorageType> types = bsp.chooseStorageTypes(replication);
+      for (StorageType t : types) {
+        if (t.supportTypeQuota()) {
+          counts.addTypeSpace(t, blockSize);
+        }
+      }
+    }
   }
 
   /**
