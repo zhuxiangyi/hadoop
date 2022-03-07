@@ -423,6 +423,8 @@ public class TestFileTruncate {
     // Delete file. Should still be able to read snapshots
     int numINodes = fsDir.getInodeMapSize();
     isReady = fs.delete(src, false);
+    BlockManagerTestUtil.waitForMarkedDeleteQueueIsEmpty(
+        cluster.getNamesystem(0).getBlockManager());
     assertTrue("Delete failed.", isReady);
     assertFileLength(snapshotFiles[3], length[3]);
     assertFileLength(snapshotFiles[2], length[2]);
@@ -1432,7 +1434,7 @@ public class TestFileTruncate {
    * Test Quota space consumed with multiple snapshots.
    */
   @Test
-  public void testQuotaSpaceConsumedWithSnapshots() throws IOException {
+  public void testQuotaSpaceConsumedWithSnapshots() throws IOException, InterruptedException {
     Path root = new Path("/");
     Path dir = new Path(root, "dir");
     fs.mkdirs(dir);
@@ -1463,6 +1465,8 @@ public class TestFileTruncate {
     assertEquals(fs.getContentSummary(root).getSpaceConsumed(),
         fs.getQuotaUsage(root).getSpaceConsumed());
     fs.delete(dir, true);
+    BlockManagerTestUtil.waitForMarkedDeleteQueueIsEmpty(
+        cluster.getNamesystem(0).getBlockManager());
     assertEquals(fs.getContentSummary(root).getSpaceConsumed(),
         fs.getQuotaUsage(root).getSpaceConsumed());
 

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -350,6 +351,8 @@ public class TestStripedINodeFile {
 
       // delete directory with erasure coding policy
       dfs.delete(ecDir, true);
+      BlockManagerTestUtil.waitForMarkedDeleteQueueIsEmpty(
+          cluster.getNamesystem(0).getBlockManager());
       for (BlockInfo blockInfo : stripedBlks) {
         assertTrue("Didn't mark the block as deleted!", blockInfo.isDeleted());
       }
@@ -368,6 +371,8 @@ public class TestStripedINodeFile {
 
       // delete parent directory
       dfs.delete(parentDir, true);
+      BlockManagerTestUtil.waitForMarkedDeleteQueueIsEmpty(
+          cluster.getNamesystem(0).getBlockManager());
       for (BlockInfo blockInfo : contiguousBlks) {
         assertTrue("Didn't mark the block as deleted!", blockInfo.isDeleted());
       }

@@ -78,7 +78,7 @@ public class INodesInPath {
    * @param inode to construct from
    * @return INodesInPath
    */
-  static INodesInPath fromINode(INode inode) {
+  public static INodesInPath fromINode(INode inode) {
     INode[] inodes = getINodes(inode);
     byte[][] paths = getPaths(inodes);
     return new INodesInPath(inodes, paths);

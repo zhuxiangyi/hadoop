@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -999,6 +1000,7 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
     protected final BlocksMapUpdateInfo collectedBlocks;
     protected final List<INode> removedINodes;
     protected final List<Long> removedUCFiles;
+    protected INodesInPath iip;
     /** Used to collect quota usage delta */
     private final QuotaDelta quotaDelta;
 
@@ -1023,6 +1025,20 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
       this.quotaDelta = new QuotaDelta();
     }
 
+    public ReclaimContext(
+        BlockStoragePolicySuite bsps, BlocksMapUpdateInfo collectedBlocks,
+        List<INode> removedINodes, List<Long> removedUCFiles, INodesInPath iip) {
+      this.bsps = bsps;
+      this.collectedBlocks = collectedBlocks;
+      this.removedINodes = removedINodes;
+      this.removedUCFiles = removedUCFiles;
+      this.quotaDelta = new QuotaDelta();
+      this.iip = iip;
+    }
+
+    public INodesInPath getINodesInPath(){
+      return iip;
+    }
     public BlockStoragePolicySuite storagePolicySuite() {
       return bsps;
     }
@@ -1041,7 +1057,7 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
      */
     public ReclaimContext getCopy() {
       return new ReclaimContext(bsps, collectedBlocks, removedINodes,
-          removedUCFiles);
+          removedUCFiles, iip);
     }
   }
 

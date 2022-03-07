@@ -190,7 +190,10 @@ public class BlockManagerTestUtil {
   public static void waitForMarkedDeleteQueueIsEmpty(
       BlockManager blockManager) throws InterruptedException {
     while (true) {
-      if (blockManager.getMarkedDeleteQueue().isEmpty()) {
+      if (blockManager.getMarkedDeleteQueue().isEmpty() &&
+          blockManager.getWaitingCollectBlockForInodeQueue().isEmpty() &&
+          blockManager.getWaitingReclaimContextQueue().isEmpty()
+      ){
         return;
       }
       Thread.sleep(SLEEP_TIME);

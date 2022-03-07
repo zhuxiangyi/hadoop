@@ -3362,7 +3362,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   boolean delete(String src, boolean recursive, boolean logRetryCache)
       throws IOException {
     final String operationName = "delete";
-    BlocksMapUpdateInfo toRemovedBlocks = null;
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     FSPermissionChecker.setOperationType(operationName);
@@ -3372,9 +3371,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       try {
         checkOperation(OperationCategory.WRITE);
         checkNameNodeSafeMode("Cannot delete " + src);
-        toRemovedBlocks = FSDirDeleteOp.delete(
-            this, pc, src, recursive, logRetryCache);
-        ret = toRemovedBlocks != null;
+        ret = FSDirDeleteOp.delete(this, pc, src, recursive, logRetryCache);
       } finally {
         writeUnlock(operationName, getLockReportInfoSupplier(src));
       }
@@ -3384,10 +3381,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
     getEditLog().logSync();
     logAuditEvent(ret, operationName, src);
-    if (toRemovedBlocks != null) {
-      blockManager.addBLocksToMarkedDeleteQueue(
-          toRemovedBlocks.getToDeleteList());
-    }
     return ret;
   }
 
@@ -3879,7 +3872,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new IOException("Cannot finalize file " + src
           + " because it is not under construction");
     }
-
+    // check if the inode has been removed
+    getFSDirectory().checkInodeInDeleting(pendingFile);
     pendingFile.recordModification(latestSnapshot);
 
     // The file is no longer pending.
@@ -4598,15 +4592,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
         for (BlockCollection bc : filesToDelete) {
           LOG.warn("Removing lazyPersist file " + bc.getName() + " with no replicas.");
-          BlocksMapUpdateInfo toRemoveBlocks =
-              FSDirDeleteOp.deleteInternal(
-                  FSNamesystem.this,
+              FSDirDeleteOp.deleteInternal(FSNamesystem.this,
                   INodesInPath.fromINode((INodeFile) bc), false);
-          changed |= toRemoveBlocks != null;
-          if (toRemoveBlocks != null) {
-            blockManager.addBLocksToMarkedDeleteQueue(
-                toRemoveBlocks.getToDeleteList());
-          }
         }
       } finally {
         writeUnlock("clearCorruptLazyPersistFiles");
@@ -4954,11 +4941,16 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkSuperuserPrivilege(operationName);
 
     boolean saved = false;
+    // wait for the deletion process to complete
+    getFSDirectory().awaitDeletingFinish();
     cpLock();  // Block if a checkpointing is in progress on standby.
     readLock();
     try {
       checkOperation(OperationCategory.UNCHECKED);
-
+      if (!getBlockManager().getWaitingCollectBlockForInodeQueue().isEmpty()) {
+        throw new IOException("deletion should be finish "
+            + "in order to create namespace image.");
+      }
       if (!isInSafeMode()) {
         throw new IOException("Safe mode should be turned ON "
             + "in order to create namespace image.");

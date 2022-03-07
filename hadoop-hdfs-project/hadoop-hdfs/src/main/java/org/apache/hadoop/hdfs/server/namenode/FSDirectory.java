@@ -780,6 +780,8 @@ public class FSDirectory implements Closeable {
         iip = INodesInPath.fromINode(inode);
       }
     }
+    // check if the inode has been removed
+    checkInodeInDeleting(iip.getLastINode());
     return iip;
   }
 
@@ -1465,6 +1467,40 @@ public class FSDirectory implements Closeable {
       src = src.substring(0, src.length() - 1);
     }
     return src;
+  }
+
+  /**
+   * check inode whether in deleting
+   */
+  public void checkInodeInDeleting(INode inode) throws FileNotFoundException {
+    INode tmpNode = inode;
+    while (tmpNode != null) {
+      if (namesystem.getBlockManager().getWaitingCollectBlockForInodeSet().contains(tmpNode)) {
+        throw new FileNotFoundException("File does not exist");
+      }
+      tmpNode = tmpNode.getParent();
+    }
+  }
+
+  /**
+   * await Deleting is empty
+   */
+  public void awaitDeletingFinish() {
+    LOG.info("wait for the deletion process to complete");
+    BlockManager blockManager = namesystem.getBlockManager();
+    while (true) {
+      if (blockManager.getMarkedDeleteQueue().isEmpty() &&
+          blockManager.getWaitingCollectBlockForInodeQueue().isEmpty() &&
+          blockManager.getWaitingReclaimContextQueue().isEmpty()
+      ) {
+        return;
+      }
+      try {
+        Thread.sleep(100);
+      } catch (Exception e) {
+        LOG.info("Namenode is down");
+      }
+    }
   }
 
   @VisibleForTesting

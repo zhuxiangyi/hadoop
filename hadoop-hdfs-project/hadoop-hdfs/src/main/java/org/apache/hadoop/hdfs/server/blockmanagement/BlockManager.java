@@ -89,6 +89,10 @@ import org.apache.hadoop.hdfs.server.blockmanagement.PendingReconstructionBlocks
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
+import org.apache.hadoop.hdfs.server.namenode.FSDirDeleteOp;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.apache.hadoop.hdfs.server.namenode.INode.ReclaimContext;
 import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.INodesInPath;
@@ -120,6 +124,8 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.ChunkedArrayList;
+import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.LightWeightGSet;
@@ -334,6 +340,18 @@ public class BlockManager implements BlockStatsMXBean {
   private final Daemon markedDeleteBlockScrubberThread =
       new Daemon(new MarkedDeleteBlockScrubber());
 
+  /**
+   * reclaimAndUpdateQuotaForDelete thread for handling async reclaim and updateQuota for delete.
+   */
+  private final Daemon reclaimAndUpdateQuotaForDelete =
+      new Daemon(new ReclaimAndUpdateQuotaForDelete());
+
+  /**
+   * collectBlockForDelete thread for handling async collect blocks for delete.
+   */
+  private final Daemon collectBlockForDelete =
+      new Daemon(new CollectBlockForDelete());
+
   /** Block report thread for handling async reports. */
   private final BlockReportProcessingThread blockReportThread;
 
@@ -439,6 +457,17 @@ public class BlockManager implements BlockStatsMXBean {
   private final ConcurrentLinkedQueue<List<BlockInfo>> markedDeleteQueue;
 
   /**
+   * The blocks of deleted files are put into the set and queue,
+   * and the CollectBlock thread collect these blocks periodically.
+   */
+  private final Set<INode> waitingCollectBlockForInodeSet;
+
+  private final ConcurrentLinkedQueue<INodesInPath> waitingCollectBlockForInodeQueue;
+
+  // Todo
+  private final ConcurrentLinkedQueue<ReclaimContext> waitingReclaimContextQueue;
+
+  /**
    * Progress of the Reconstruction queues initialisation.
    */
   private double reconstructionQueuesInitProgress = 0.0;
@@ -492,6 +521,9 @@ public class BlockManager implements BlockStatsMXBean {
         startupDelayBlockDeletionInMs,
         blockIdManager);
     markedDeleteQueue = new ConcurrentLinkedQueue<>();
+    waitingCollectBlockForInodeSet = Sets.newConcurrentHashSet();
+    waitingCollectBlockForInodeQueue = new ConcurrentLinkedQueue<>();
+    waitingReclaimContextQueue = new ConcurrentLinkedQueue<>();
     // Compute the map capacity by allocating 2% of total memory
     blocksMap = new BlocksMap(
         LightWeightGSet.computeCapacity(2.0, "BlocksMap"));
@@ -744,9 +776,15 @@ public class BlockManager implements BlockStatsMXBean {
     this.markedDeleteBlockScrubberThread.
         setName("MarkedDeleteBlockScrubberThread");
     this.markedDeleteBlockScrubberThread.start();
+    this.reclaimAndUpdateQuotaForDelete.setName("ReclaimAndUpdateQuotaForDelete");
+    this.reclaimAndUpdateQuotaForDelete.start();
+    this.collectBlockForDelete.setName("CollectBlockForDelete");
+    this.collectBlockForDelete.start();
     this.blockReportThread.start();
     mxBeanName = MBeans.register("NameNode", "BlockStats", this);
     bmSafeMode.activate(blockTotal);
+
+
   }
 
   public void close() {
@@ -758,9 +796,13 @@ public class BlockManager implements BlockStatsMXBean {
       redundancyThread.interrupt();
       blockReportThread.interrupt();
       markedDeleteBlockScrubberThread.interrupt();
+      reclaimAndUpdateQuotaForDelete.interrupt();
+      collectBlockForDelete.interrupt();
       redundancyThread.join(3000);
       blockReportThread.join(3000);
       markedDeleteBlockScrubberThread.join(3000);
+      reclaimAndUpdateQuotaForDelete.join(3000);
+      collectBlockForDelete.join(3000);
     } catch (InterruptedException ie) {
     }
     datanodeManager.close();
@@ -5025,6 +5067,102 @@ public class BlockManager implements BlockStatsMXBean {
   }
 
   /**
+   * Periodically collect blocks to be deleted
+   */
+  private class CollectBlockForDelete implements Runnable {
+    @Override
+    public void run() {
+      LOG.info("Start CollectBlockForDelete thread");
+      while (namesystem.isRunning() &&
+          !Thread.currentThread().isInterrupted()) {
+        long collectBlockForDeleteIntervalTimeMs = 50;
+        NameNodeMetrics metrics = NameNode.getNameNodeMetrics();
+        if (!waitingCollectBlockForInodeQueue.isEmpty()) {
+          try {
+            while (waitingCollectBlockForInodeQueue.iterator().hasNext()) {
+              INodesInPath iip = waitingCollectBlockForInodeQueue.poll();
+              ReclaimContext reclaimContext = new ReclaimContext(
+                  namesystem.getFSDirectory().getBlockStoragePolicySuite(),
+                  new BlocksMapUpdateInfo(), new ChunkedArrayList<>(),
+                  new ChunkedArrayList<>(), iip);
+              // destroyAndCollectBlocks no held lock
+              iip.getLastINode().destroyAndCollectBlocks(reclaimContext);
+
+              metrics.decrPendingCollectBlockForInodeQueueCount();
+              waitingReclaimContextQueue.offer(reclaimContext);
+              metrics.incrPendingReclaimAndUpdateQuotaForDeleteCount();
+            }
+          } catch (Exception e){
+            LOG.warn("CollectBlockForDelete thread encountered an exception" +
+                    " during the block collect process, " +
+                    " the collection of the block will retry in {} millisecond.",
+                collectBlockForDeleteIntervalTimeMs, e);
+          }
+        }
+
+        try {
+          Thread.sleep(collectBlockForDeleteIntervalTimeMs);
+        } catch (InterruptedException e) {
+          LOG.info("Stopping CollectBlockForDelete thread.");
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Periodically collect blocks to be deleted
+   */
+  private class ReclaimAndUpdateQuotaForDelete implements Runnable {
+    @Override
+    public void run() {
+      LOG.info("Start ReclaimAndUpdateQuotaForDelete thread");
+      while (namesystem.isRunning() &&
+          !Thread.currentThread().isInterrupted()) {
+        if (!waitingReclaimContextQueue.isEmpty()) {
+          long reclaimAndUpdateQuotaLockTimeMs = 50;
+          try {
+            NameNodeMetrics metrics = NameNode.getNameNodeMetrics();
+            namesystem.writeLock();
+            long startTime = Time.monotonicNow();
+            while (waitingReclaimContextQueue.iterator().hasNext()) {
+              if (Time.monotonicNow() - startTime > reclaimAndUpdateQuotaLockTimeMs) {
+                break;
+              }
+              ReclaimContext reclaimContext = waitingReclaimContextQueue.poll();
+              FSDirDeleteOp.reclaimAndUpdateQuota((FSNamesystem) namesystem, reclaimContext);
+              metrics.decrPendingReclaimAndUpdateQuotaForDeleteCount();
+              // add a block to be deleted to the queue
+              if (reclaimContext.collectedBlocks() != null) {
+                List<BlockInfo> deleteList = reclaimContext.collectedBlocks().getToDeleteList();
+                addBLocksToMarkedDeleteQueue(deleteList);
+                metrics.incrPendingDeleteBlocksCount(deleteList.size());
+              }
+              waitingCollectBlockForInodeSet.remove(reclaimContext.
+                  getINodesInPath().getLastINode());
+            }
+          } catch (Exception e){
+            LOG.warn("ReclaimAndUpdateQuotaForDelete thread encountered an exception" +
+                    " during the recycle process, " +
+                    " the recycle thread will retry in {} millisecond.",
+                reclaimAndUpdateQuotaLockTimeMs, e);
+          }finally {
+            namesystem.writeUnlock();
+          }
+        }
+
+        try {
+          long reclaimAndUpdateQuotaIntervalTimeMs = 50;
+          Thread.sleep(reclaimAndUpdateQuotaIntervalTimeMs);
+        } catch (InterruptedException e) {
+          LOG.info("Stopping ReclaimAndUpdateQuotaForDelete thread.");
+          break;
+        }
+      }
+    }
+  }
+
+  /**
    * Periodically calls computeBlockRecoveryWork().
    */
   private class RedundancyMonitor implements Runnable {
@@ -5375,6 +5513,18 @@ public class BlockManager implements BlockStatsMXBean {
   @VisibleForTesting
   public ConcurrentLinkedQueue<List<BlockInfo>> getMarkedDeleteQueue() {
     return markedDeleteQueue;
+  }
+
+  public Set<INode> getWaitingCollectBlockForInodeSet() {
+    return waitingCollectBlockForInodeSet;
+  }
+
+  public ConcurrentLinkedQueue<INodesInPath> getWaitingCollectBlockForInodeQueue() {
+    return waitingCollectBlockForInodeQueue;
+  }
+
+  public ConcurrentLinkedQueue<ReclaimContext> getWaitingReclaimContextQueue() {
+    return waitingReclaimContextQueue;
   }
 
   public void addBLocksToMarkedDeleteQueue(List<BlockInfo> blockInfos) {

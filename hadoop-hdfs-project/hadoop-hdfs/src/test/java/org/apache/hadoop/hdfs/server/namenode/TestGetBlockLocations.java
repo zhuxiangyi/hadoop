@@ -75,9 +75,7 @@ public class TestGetBlockLocations {
           fsn.writeLock();
           try {
             INodesInPath iip = fsd.getINodesInPath(FILE_PATH, DirOp.READ);
-            FSDirDeleteOp.delete(fsd, iip, new INode.BlocksMapUpdateInfo(),
-                                 new ArrayList<INode>(), new ArrayList<Long>(),
-                                 now());
+            FSDirDeleteOp.delete(fsd, iip, now());
           } finally {
             fsn.writeUnlock();
           }

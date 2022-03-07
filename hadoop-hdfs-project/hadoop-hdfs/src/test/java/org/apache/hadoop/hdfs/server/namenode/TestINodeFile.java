@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -476,7 +477,7 @@ public class TestINodeFile {
    * This test verifies inode ID counter and inode map functionality.
    */
   @Test
-  public void testInodeId() throws IOException {
+  public void testInodeId() throws IOException, InterruptedException {
     Configuration conf = new Configuration();
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY,
         DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT);
@@ -525,6 +526,8 @@ public class TestINodeFile {
       // Delete test2/file and test2 and ensure inode map size decreases
       assertTrue(fs.delete(renamedPath, true));
       inodeCount -= 2;
+      BlockManagerTestUtil.waitForMarkedDeleteQueueIsEmpty(
+          cluster.getNamesystem(0).getBlockManager());
       assertEquals(inodeCount, fsn.dir.getInodeMapSize());
       
       // Create and concat /test/file1 /test/file2
@@ -543,6 +546,8 @@ public class TestINodeFile {
       assertEquals(inodeCount, fsn.dir.getInodeMapSize());
       assertEquals(expectedLastInodeId, fsn.dir.getLastInodeId());
       assertTrue(fs.delete(new Path("/test1"), true));
+      BlockManagerTestUtil.waitForMarkedDeleteQueueIsEmpty(
+          cluster.getNamesystem(0).getBlockManager());
       inodeCount -= 2; // test1 and file2 is deleted
       assertEquals(inodeCount, fsn.dir.getInodeMapSize());
 
@@ -1175,6 +1180,8 @@ public class TestINodeFile {
 
       // Test the deleted startAfter file
       hdfs.delete(new Path("/tmp/f2"), false);
+      BlockManagerTestUtil.waitForMarkedDeleteQueueIsEmpty(
+          cluster.getNamesystem(0).getBlockManager());
       try {
         dl = cluster.getNameNodeRpc().getListing("/tmp",
             f2InodePath.getBytes(), false);
